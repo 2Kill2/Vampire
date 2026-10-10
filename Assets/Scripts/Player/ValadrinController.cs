@@ -73,12 +73,14 @@ namespace Bloodbound
         // Reads gameplay actions and advances stamina, movement, and combat each frame.
         private void Update()
         {
-            if (IsDefeated)
+            if (controls.Gameplay.Restart.WasPressedThisFrame())
             {
-                if (controls.Gameplay.Restart.WasPressedThisFrame())
-                    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
                 return;
             }
+
+            if (IsDefeated)
+                return;
 
             if (controls.Gameplay.LockOn.WasPressedThisFrame())
                 ToggleTargetLock();

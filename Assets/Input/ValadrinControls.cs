@@ -105,7 +105,7 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
                     ""name"": ""Attack"",
                     ""type"": ""Button"",
                     ""id"": ""a692d4cf-48ea-43a3-9e4e-c3aa9d280891"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -132,7 +132,7 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
                     ""name"": ""Restart"",
                     ""type"": ""Button"",
                     ""id"": ""ae15a8b2-4462-48f4-9922-bddb33aee0bb"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -362,7 +362,13 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
             ]
         }
     ],
-    ""controlSchemes"": []
+    ""controlSchemes"": [
+        {
+            ""name"": ""New Control Scheme"",
+            ""bindingGroup"": ""New Control Scheme"",
+            ""devices"": []
+        }
+    ]
 }");
         // Gameplay
         m_Gameplay = asset.FindActionMap("Gameplay", throwIfNotFound: true);
@@ -587,6 +593,19 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
     /// Provides a new <see cref="GameplayActions" /> instance referencing this action map.
     /// </summary>
     public GameplayActions @Gameplay => new GameplayActions(this);
+    private int m_NewControlSchemeSchemeIndex = -1;
+    /// <summary>
+    /// Provides access to the input control scheme.
+    /// </summary>
+    /// <seealso cref="UnityEngine.InputSystem.InputControlScheme" />
+    public InputControlScheme NewControlSchemeScheme
+    {
+        get
+        {
+            if (m_NewControlSchemeSchemeIndex == -1) m_NewControlSchemeSchemeIndex = asset.FindControlSchemeIndex("New Control Scheme");
+            return asset.controlSchemes[m_NewControlSchemeSchemeIndex];
+        }
+    }
     /// <summary>
     /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "Gameplay" which allows adding and removing callbacks.
     /// </summary>
