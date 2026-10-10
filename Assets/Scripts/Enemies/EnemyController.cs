@@ -20,17 +20,19 @@ namespace Bloodbound
         public float MaxHealth => maxHealth;
         public bool IsAlive => currentHealth > 0f;
 
+        // Initializes enemy health, caches its renderer, and finds Valadrin.
         private void Awake()
         {
             currentHealth = maxHealth;
             bodyRenderer = GetComponentInChildren<Renderer>();
             if (bodyRenderer != null)
                 baseColor = bodyRenderer.material.color;
-            ValadrinController valadrin = FindFirstObjectByType<ValadrinController>();
+            ValadrinController valadrin = FindAnyObjectByType<ValadrinController>();
             if (valadrin != null)
                 player = valadrin.transform;
         }
 
+        // Pursues Valadrin until in range, then attacks on a timed interval.
         private void Update()
         {
             if (!IsAlive || player == null)
@@ -54,6 +56,7 @@ namespace Bloodbound
             }
         }
 
+        // Reduces enemy health, flashes on hit, and deactivates the enemy when defeated.
         public void TakeDamage(float amount)
         {
             if (!IsAlive)
@@ -65,6 +68,7 @@ namespace Bloodbound
                 gameObject.SetActive(false);
         }
 
+        // Briefly tints the enemy red before restoring its original material color.
         private System.Collections.IEnumerator HitFlash()
         {
             bodyRenderer.material.color = new Color(1f, 0.45f, 0.45f);

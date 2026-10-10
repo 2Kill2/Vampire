@@ -31,6 +31,7 @@ namespace Bloodbound
         private float attackReadyAt;
         private bool isDodging;
         private EnemyController lockedTarget;
+        private global::ValadrinControls controls;
 
         public float CurrentHealth => currentHealth;
         public float MaxHealth => maxHealth;
@@ -39,29 +40,53 @@ namespace Bloodbound
         public EnemyController LockedTarget => lockedTarget;
         public bool IsDefeated => currentHealth <= 0f;
 
+        // Creates Valadrin's runtime state and constructs the generated input wrapper.
         private void Awake()
         {
             characterController = GetComponent<CharacterController>();
             currentHealth = maxHealth;
             currentStamina = maxStamina;
+
+            controls = new global::ValadrinControls();
         }
 
+        // Enables the generated gameplay action map while this component is active.
+        private void OnEnable()
+        {
+            if (controls != null)
+                controls.Enable();
+        }
+
+        // Disables the gameplay action map when Valadrin is inactive.
+        private void OnDisable()
+        {
+            if (controls != null)
+                controls.Disable();
+        }
+
+        // Releases the generated input asset when this controller is destroyed.
+        private void OnDestroy()
+        {
+            controls?.Dispose();
+        }
+
+        // Reads gameplay actions and advances stamina, movement, and combat each frame.
         private void Update()
         {
             if (IsDefeated)
             {
-                if (Input.GetKeyDown(KeyCode.R))
+                if (controls.Gameplay.Restart.WasPressedThisFrame())
                     SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Tab))
+            if (controls.Gameplay.LockOn.WasPressedThisFrame())
                 ToggleTargetLock();
 
-            if (Input.GetKeyDown(KeyCode.J) || Input.GetMouseButtonDown(0) || Input.GetButtonDown("Fire1"))
+            if (controls.Gameplay.Attack.WasPressedThisFrame())
                 TryAttack();
 
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.LeftShift) || Input.GetButtonDown("Fire2"))
+            if (controls.Gameplay.Dodge.WasPressedThisFrame())
                 TryDodge();
 
             currentStamina = Mathf.Min(maxStamina, currentStamina + staminaRecovery * Time.deltaTime);
@@ -69,9 +94,10 @@ namespace Bloodbound
             FaceDesiredDirection();
         }
 
+        // Converts camera-relative movement input into CharacterController motion and gravity.
         private void MoveCharacter()
         {
-            Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+            Vector2 input = controls.Gameplay.Move.ReadValue<Vector2>();
             input = Vector2.ClampMagnitude(input, 1f);
 
             Transform cameraTransform = Camera.main != null ? Camera.main.transform : transform;
@@ -91,6 +117,7 @@ namespace Bloodbound
             characterController.Move(verticalVelocity * Time.deltaTime);
         }
 
+        // Rotates Valadrin toward her locked target or current movement direction.
         private void FaceDesiredDirection()
         {
             Vector3 direction = Vector3.zero;
@@ -101,7 +128,8 @@ namespace Bloodbound
                 Transform cameraTransform = Camera.main != null ? Camera.main.transform : transform;
                 Vector3 forward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
                 Vector3 right = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
-                direction = forward * Input.GetAxisRaw("Vertical") + right * Input.GetAxisRaw("Horizontal");
+                Vector2 input = controls.Gameplay.Move.ReadValue<Vector2>();
+                direction = forward * input.y + right * input.x;
             }
 
             direction.y = 0f;
@@ -111,6 +139,7 @@ namespace Bloodbound
             transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
         }
 
+        // Spends stamina and damages living enemies in Valadrin's forward attack area.
         private void TryAttack()
         {
             if (Time.time < attackReadyAt || currentStamina < attackCost)
@@ -128,20 +157,22 @@ namespace Bloodbound
             }
         }
 
+        // Spends stamina and starts a short directional dodge using the current move input.
         private void TryDodge()
         {
             if (isDodging || currentStamina < 28f)
                 return;
 
             currentStamina -= 28f;
-            Vector3 input = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical"));
+            Vector2 input = controls.Gameplay.Move.ReadValue<Vector2>();
             Transform cameraTransform = Camera.main != null ? Camera.main.transform : transform;
             Vector3 forward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
             Vector3 right = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
-            dodgeDirection = input.sqrMagnitude > 0.01f ? (forward * input.z + right * input.x).normalized : transform.forward;
+            dodgeDirection = input.sqrMagnitude > 0.01f ? (forward * input.y + right * input.x).normalized : transform.forward;
             StartCoroutine(DodgeRoutine());
         }
 
+        // Moves Valadrin quickly in the chosen dodge direction for the dodge duration.
         private IEnumerator DodgeRoutine()
         {
             isDodging = true;
@@ -154,6 +185,7 @@ namespace Bloodbound
             isDodging = false;
         }
 
+        // Toggles lock-on to the nearest living enemy in the scene.
         private void ToggleTargetLock()
         {
             if (lockedTarget != null)
@@ -162,7 +194,7 @@ namespace Bloodbound
                 return;
             }
 
-            EnemyController[] enemies = FindObjectsByType<EnemyController>(FindObjectsSortMode.None);
+            EnemyController[] enemies = FindObjectsByType<EnemyController>();
             float closestDistance = float.MaxValue;
             foreach (EnemyController enemy in enemies)
             {
@@ -177,6 +209,7 @@ namespace Bloodbound
             }
         }
 
+        // Applies incoming damage and clamps Valadrin's health at zero.
         public void TakeDamage(float amount)
         {
             if (IsDefeated)
@@ -184,6 +217,7 @@ namespace Bloodbound
             currentHealth = Mathf.Max(0f, currentHealth - amount);
         }
 
+        // Draws the prototype health, stamina, target, and encounter status interface.
         private void OnGUI()
         {
             GUI.Box(new Rect(18, 18, 300, 112), "VALADRIN");
@@ -191,8 +225,8 @@ namespace Bloodbound
             DrawBar(new Rect(32, 78, 270, 18), currentStamina / maxStamina, new Color(0.76f, 0.63f, 0.2f), "Stamina");
 
             GUI.Box(new Rect(18, Screen.height - 112, 380, 92), "CONTROLS");
-            GUI.Label(new Rect(32, Screen.height - 84, 350, 20), "Move: WASD / left stick    Attack: J / left mouse");
-            GUI.Label(new Rect(32, Screen.height - 62, 350, 20), "Dodge: Space / left Shift    Target lock: Tab");
+            GUI.Label(new Rect(32, Screen.height - 84, 350, 20), "Move: WASD / left stick    Attack: J / left mouse / X");
+            GUI.Label(new Rect(32, Screen.height - 62, 350, 20), "Dodge: Space / Shift / A    Target lock: Tab / R3");
 
             if (lockedTarget != null && lockedTarget.IsAlive)
             {
@@ -201,10 +235,15 @@ namespace Bloodbound
             }
             if (IsDefeated)
                 GUI.Box(new Rect(Screen.width * 0.5f - 170, Screen.height * 0.5f - 35, 340, 70), "VALADRIN HAS FALLEN\nPress R to restart the encounter");
-            else if (FindFirstObjectByType<EnemyController>() == null || !FindFirstObjectByType<EnemyController>().IsAlive)
-                GUI.Box(new Rect(Screen.width * 0.5f - 160, 22, 320, 44), "ENCOUNTER CLEARED  |  Press R to restart");
+            else
+            {
+                EnemyController enemy = FindAnyObjectByType<EnemyController>();
+                if (enemy == null || !enemy.IsAlive)
+                    GUI.Box(new Rect(Screen.width * 0.5f - 160, 22, 320, 44), "ENCOUNTER CLEARED  |  Press R to restart");
+            }
         }
 
+        // Draws a labeled background bar and a clamped colored fill for a normalized value.
         private static void DrawBar(Rect rect, float ratio, Color fill, string label)
         {
             GUI.color = new Color(0.08f, 0.08f, 0.1f, 0.92f);
