@@ -136,6 +136,24 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Claim"",
+                    ""type"": ""Button"",
+                    ""id"": ""7cc4c908-3294-4d2f-8a27-b2d786b5ab12"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""BloodPower"",
+                    ""type"": ""Button"",
+                    ""id"": ""a9d35d8f-1269-48fd-b9f1-caa0291ff77b"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -358,6 +376,50 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
                     ""action"": ""Restart"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""e2a47da1-4b72-4d52-a417-beff565634a5"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Claim"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""e22648c0-eab5-4d84-9304-ccb653d05937"",
+                    ""path"": ""<Gamepad>/buttonNorth"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Claim"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""2657c48f-d57d-4e42-b827-4c26b81d4ce5"",
+                    ""path"": ""<Keyboard>/q"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""BloodPower"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b5d25669-0706-4f4a-b69c-adb5876dcef8"",
+                    ""path"": ""<Gamepad>/rightShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""BloodPower"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -377,6 +439,8 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
         m_Gameplay_Dodge = m_Gameplay.FindAction("Dodge", throwIfNotFound: true);
         m_Gameplay_LockOn = m_Gameplay.FindAction("LockOn", throwIfNotFound: true);
         m_Gameplay_Restart = m_Gameplay.FindAction("Restart", throwIfNotFound: true);
+        m_Gameplay_Claim = m_Gameplay.FindAction("Claim", throwIfNotFound: true);
+        m_Gameplay_BloodPower = m_Gameplay.FindAction("BloodPower", throwIfNotFound: true);
     }
 
     ~@ValadrinControls()
@@ -462,6 +526,8 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
     private readonly InputAction m_Gameplay_Dodge;
     private readonly InputAction m_Gameplay_LockOn;
     private readonly InputAction m_Gameplay_Restart;
+    private readonly InputAction m_Gameplay_Claim;
+    private readonly InputAction m_Gameplay_BloodPower;
     /// <summary>
     /// Provides access to input actions defined in input action map "Gameplay".
     /// </summary>
@@ -493,6 +559,14 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Gameplay/Restart".
         /// </summary>
         public InputAction @Restart => m_Wrapper.m_Gameplay_Restart;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/Claim".
+        /// </summary>
+        public InputAction @Claim => m_Wrapper.m_Gameplay_Claim;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/BloodPower".
+        /// </summary>
+        public InputAction @BloodPower => m_Wrapper.m_Gameplay_BloodPower;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -534,6 +608,12 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
             @Restart.started += instance.OnRestart;
             @Restart.performed += instance.OnRestart;
             @Restart.canceled += instance.OnRestart;
+            @Claim.started += instance.OnClaim;
+            @Claim.performed += instance.OnClaim;
+            @Claim.canceled += instance.OnClaim;
+            @BloodPower.started += instance.OnBloodPower;
+            @BloodPower.performed += instance.OnBloodPower;
+            @BloodPower.canceled += instance.OnBloodPower;
         }
 
         /// <summary>
@@ -560,6 +640,12 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
             @Restart.started -= instance.OnRestart;
             @Restart.performed -= instance.OnRestart;
             @Restart.canceled -= instance.OnRestart;
+            @Claim.started -= instance.OnClaim;
+            @Claim.performed -= instance.OnClaim;
+            @Claim.canceled -= instance.OnClaim;
+            @BloodPower.started -= instance.OnBloodPower;
+            @BloodPower.performed -= instance.OnBloodPower;
+            @BloodPower.canceled -= instance.OnBloodPower;
         }
 
         /// <summary>
@@ -648,5 +734,19 @@ public partial class @ValadrinControls: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnRestart(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Claim" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnClaim(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "BloodPower" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnBloodPower(InputAction.CallbackContext context);
     }
 }
