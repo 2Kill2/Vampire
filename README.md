@@ -44,3 +44,7 @@ Manual checks: defeat a thrall and claim once; try claiming again; walk out of r
 ## Blood conversion and target reticle
 
 Blood drains over time to restore health. Tune `Blood Drain Per Second` and `Health Per Blood Unit` on ValadrinController; conversion pauses when health is full and never spends more Blood than needed to fill the missing health. For target lock feedback, assign a Sprite to `Target Reticle` on ValadrinController. Reticle size and world-space target offset are configurable beside it. If the sprite is unassigned, no reticle is drawn.
+
+## Weapon prototypes
+
+Valadrin and Sword Carrier enemies use visible rectangular sword meshes mounted on hilt pivots. The sword turns red only during its configurable active damage frames. EnemyController exposes a dropdown for Sword Carrier, Spear Carrier, and Bow Carrier; only Sword Carrier is implemented so far. Enemy sword timing and dimensions are configurable on the EnemyController component.

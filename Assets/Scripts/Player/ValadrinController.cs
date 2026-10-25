@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -22,6 +23,13 @@ namespace Bloodbound
         [SerializeField] private float attackDamage = 28f;
         [SerializeField] private float attackReach = 1.7f;
         [SerializeField] private float attackCooldown = 0.5f;
+        [Header("Sword Swing Hitbox")]
+        [SerializeField, Min(0.05f)] private float attackSwingDuration = 0.42f;
+        [SerializeField, Range(0f, 1f)] private float attackHitStart = 0.28f;
+        [SerializeField, Range(0f, 1f)] private float attackHitEnd = 0.72f;
+        [SerializeField] private float swordHitboxLength = 1.15f;
+        [SerializeField] private float swordHitboxWidth = 0.28f;
+        [SerializeField] private float swordHitboxHeight = 0.18f;
 
         [Header("Blood Claim")]
         [SerializeField] private float maxBlood = 100f;
@@ -32,6 +40,10 @@ namespace Bloodbound
         [SerializeField] private float claimDuration = 0.65f;
         [SerializeField] private float claimInterruptDamage = 0.01f;
         [SerializeField] private float powerRadius = 1.85f;
+        [Header("Blood Power Swing Hitbox")]
+        [SerializeField, Min(0.05f)] private float powerSwingDuration = 0.72f;
+        [SerializeField, Range(0f, 1f)] private float powerHitStart = 0.3f;
+        [SerializeField, Range(0f, 1f)] private float powerHitEnd = 0.82f;
         [Header("Blood to Health Conversion")]
         [SerializeField, Min(0f)] private float bloodDrainPerSecond = 2f;
         [SerializeField, Min(0f)] private float healthPerBloodUnit = 0.5f;
@@ -55,6 +67,15 @@ namespace Bloodbound
         private float claimCompletesAt;
         private string bloodMessage;
         private float bloodMessageUntil;
+        private Transform swordHitboxTransform;
+        private BoxCollider swordHitboxCollider;
+        private Renderer swordHitboxRenderer;
+        private Transform powerHitboxTransform;
+        private BoxCollider powerHitboxCollider;
+        private Renderer powerHitboxRenderer;
+        private bool isAttacking;
+        private bool isUsingBloodPower;
+        private readonly HashSet<EnemyController> hitEnemiesThisSwing = new HashSet<EnemyController>();
 
         public float CurrentHealth => currentHealth;
         public float MaxHealth => maxHealth;
@@ -74,6 +95,7 @@ namespace Bloodbound
             currentBlood = 0f;
 
             controls = new global::ValadrinControls();
+            CreateSwingHitboxes();
         }
 
         // Enables the generated gameplay action map while this component is active.
@@ -88,6 +110,12 @@ namespace Bloodbound
         {
             if (controls != null)
                 controls.Disable();
+            if (swordHitboxCollider != null) swordHitboxCollider.enabled = false;
+            if (powerHitboxCollider != null) powerHitboxCollider.enabled = false;
+            if (powerHitboxTransform != null) powerHitboxTransform.gameObject.SetActive(false);
+            if (swordHitboxRenderer != null) swordHitboxRenderer.material.color = new Color(0.58f, 0.58f, 0.64f, 0.75f);
+            isAttacking = false;
+            isUsingBloodPower = false;
         }
 
         // Releases the generated input asset when this controller is destroyed.
@@ -194,18 +222,114 @@ namespace Bloodbound
         // Spends stamina and damages living enemies in Valadrin's forward attack area.
         private void TryAttack()
         {
-            if (Time.time < attackReadyAt || currentStamina < attackCost)
+            if (isAttacking || isUsingBloodPower || Time.time < attackReadyAt || currentStamina < attackCost)
                 return;
 
             currentStamina -= attackCost;
             attackReadyAt = Time.time + attackCooldown;
-            Vector3 origin = transform.position + Vector3.up * 1f + transform.forward * 0.7f;
-            Collider[] hits = Physics.OverlapSphere(origin, attackReach);
-            foreach (Collider hit in hits)
+            FaceAttackDirection();
+            StartCoroutine(SwingRoutine(false));
+        }
+
+        private void FaceAttackDirection()
+        {
+            Vector3 direction = lockedTarget != null && lockedTarget.IsAlive
+                ? lockedTarget.transform.position - transform.position
+                : transform.forward;
+            direction.y = 0f;
+            if (direction.sqrMagnitude > 0.001f)
+                transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+        }
+
+        private void CreateSwingHitboxes()
+        {
+            swordHitboxTransform = CreateSwingPivot("Sword Swing Pivot", new Vector3(0f, 0.95f, 0.38f));
+            CreateHitboxVisual("Sword Hitbox", swordHitboxTransform, new Vector3(0f, 0f, swordHitboxLength * 0.5f),
+                new Vector3(swordHitboxWidth, swordHitboxHeight, swordHitboxLength), new Color(0.58f, 0.58f, 0.64f, 0.75f),
+                out swordHitboxCollider, out swordHitboxRenderer);
+            swordHitboxTransform.gameObject.SetActive(true);
+
+            float powerLength = Mathf.Max(0.35f, powerRadius);
+            powerHitboxTransform = CreateSwingPivot("Blood Power Swing Pivot", new Vector3(0f, 0.95f, 0.4f));
+            CreateHitboxVisual("Blood Power Hitbox", powerHitboxTransform, new Vector3(0f, 0f, powerLength * 0.5f),
+                new Vector3(Mathf.Max(0.5f, powerRadius * 0.75f), Mathf.Max(0.5f, powerRadius * 0.75f), powerLength),
+                new Color(0.35f, 0.08f, 0.12f, 0.55f), out powerHitboxCollider, out powerHitboxRenderer);
+            powerHitboxTransform.gameObject.SetActive(false);
+        }
+
+        private Transform CreateSwingPivot(string objectName, Vector3 localPosition)
+        {
+            GameObject pivot = new GameObject(objectName);
+            pivot.transform.SetParent(transform, false);
+            pivot.transform.localPosition = localPosition;
+            return pivot.transform;
+        }
+
+        private void CreateHitboxVisual(string objectName, Transform parent, Vector3 localPosition, Vector3 localScale,
+            Color idleColor, out BoxCollider boxCollider, out Renderer visualRenderer)
+        {
+            GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            visual.name = objectName;
+            visual.transform.SetParent(parent, false);
+            visual.transform.localPosition = localPosition;
+            visual.transform.localScale = localScale;
+            boxCollider = visual.GetComponent<BoxCollider>();
+            boxCollider.enabled = false;
+            visualRenderer = visual.GetComponent<Renderer>();
+            visualRenderer.material.color = idleColor;
+        }
+
+        private IEnumerator SwingRoutine(bool bloodPower)
+        {
+            isAttacking = !bloodPower;
+            isUsingBloodPower = bloodPower;
+            Transform hitbox = bloodPower ? powerHitboxTransform : swordHitboxTransform;
+            BoxCollider box = bloodPower ? powerHitboxCollider : swordHitboxCollider;
+            Renderer hitboxRenderer = bloodPower ? powerHitboxRenderer : swordHitboxRenderer;
+            float duration = bloodPower ? powerSwingDuration : attackSwingDuration;
+            float activeStart = bloodPower ? powerHitStart : attackHitStart;
+            float activeEnd = bloodPower ? powerHitEnd : attackHitEnd;
+            float damage = bloodPower ? powerDamage : attackDamage;
+            Color activeColor = bloodPower ? new Color(1f, 0.08f, 0.18f, 0.8f) : new Color(1f, 0.12f, 0.08f, 0.8f);
+
+            hitEnemiesThisSwing.Clear();
+            hitbox.gameObject.SetActive(true);
+            float elapsed = 0f;
+            while (elapsed < duration)
             {
-                EnemyController enemy = hit.GetComponentInParent<EnemyController>();
-                if (enemy != null && enemy.IsAlive)
-                    enemy.TakeDamage(attackDamage);
+                float normalizedTime = Mathf.Clamp01(elapsed / duration);
+                float swing = Mathf.SmoothStep(0f, 1f, normalizedTime);
+                hitbox.localRotation = Quaternion.Euler(0f, Mathf.Lerp(-70f, 70f, swing), 0f);
+                bool hitboxActive = normalizedTime >= activeStart && normalizedTime <= activeEnd;
+                box.enabled = hitboxActive;
+                hitboxRenderer.material.color = hitboxActive ? activeColor : (bloodPower ? new Color(0.35f, 0.08f, 0.12f, 0.55f) : new Color(0.58f, 0.58f, 0.64f, 0.75f));
+                if (hitboxActive)
+                    ApplySwingHitbox(box, damage);
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            box.enabled = false;
+            hitbox.localRotation = Quaternion.identity;
+            if (bloodPower)
+                hitbox.gameObject.SetActive(false);
+            else
+                hitboxRenderer.material.color = new Color(0.58f, 0.58f, 0.64f, 0.75f);
+            isAttacking = false;
+            isUsingBloodPower = false;
+        }
+
+        private void ApplySwingHitbox(BoxCollider box, float damage)
+        {
+            Vector3 center = box.transform.TransformPoint(box.center);
+            Vector3 halfExtents = Vector3.Scale(box.size * 0.5f, box.transform.lossyScale);
+            Collider[] overlaps = Physics.OverlapBox(center, halfExtents, box.transform.rotation);
+            foreach (Collider overlap in overlaps)
+            {
+                EnemyController enemy = overlap.GetComponentInParent<EnemyController>();
+                if (enemy == null || !enemy.IsAlive || !hitEnemiesThisSwing.Add(enemy))
+                    continue;
+                enemy.TakeDamage(damage);
             }
         }
 
@@ -242,18 +366,13 @@ namespace Bloodbound
 
         private void TryBloodPower()
         {
-            if (Time.time < powerReadyAt || currentBlood < powerCost)
+            if (isAttacking || isUsingBloodPower || Time.time < powerReadyAt || currentBlood < powerCost)
                 return;
 
             currentBlood -= powerCost;
             powerReadyAt = Time.time + 0.8f;
-            Vector3 origin = transform.position + Vector3.up + transform.forward * 0.8f;
-            foreach (Collider hit in Physics.OverlapSphere(origin, powerRadius))
-            {
-                EnemyController enemy = hit.GetComponentInParent<EnemyController>();
-                if (enemy != null && enemy.IsAlive)
-                    enemy.TakeDamage(powerDamage);
-            }
+            FaceAttackDirection();
+            StartCoroutine(SwingRoutine(true));
         }
 
         // Spends stamina and starts a short directional dodge using the current move input.
